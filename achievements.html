@@ -33,7 +33,6 @@
 let defs = [];
 let lastList = '';
 const hue = i => Math.round((i * 137.5) % 360);
-const iconOf = d => esc(d.icon || (d.name || '?').trim().charAt(0).toUpperCase());
 
 function render(model) {
   const evals = evaluateAchievements(model, defs);
@@ -60,8 +59,7 @@ function render(model) {
             ? ev.holders.map(h => `<span class="chip">${esc(h.player)}${h.at ? ` <small>${esc(h.at)}</small>` : ''}</span>`).join('')
             : '<span class="pending">Not earned yet</span>';
         return `<article class="card ${n ? '' : 'locked'}" style="--h:${hue(i)};--i:${i}">` +
-          `<div class="card-top"><div class="badge" aria-hidden="true">${iconOf(ev.def)}</div>` +
-          `<div><h3>${esc(ev.def.name)}</h3><p>${esc(ev.def.description || '')}</p></div></div>` +
+          `<div><h3>${esc(ev.def.name)}</h3><p>${esc(ev.def.description || '')}</p></div>` +
           `<div class="chips">${chips}</div>` +
           `<div class="meter" aria-hidden="true"><i style="width:${(n / total * 100).toFixed(0)}%"></i></div>` +
           `<div class="meta">${n} of ${total} players</div></article>`;
@@ -75,7 +73,7 @@ function render(model) {
     '<thead><tr><th>Player</th><th class="num">Earned</th><th>Achievements</th></tr></thead><tbody>' +
     counts.map(c =>
       `<tr><td>${esc(c.player)}</td><td class="num">${c.mine.length}</td>` +
-      `<td class="chipcell">${c.mine.length ? c.mine.map(ev => `<span class="mini" title="${esc(ev.def.name)}">${iconOf(ev.def)}</span>`).join('') : '<span class="pending">None yet</span>'}</td></tr>`
+      `<td class="chipcell">${c.mine.length ? c.mine.map(ev => `<span class="chip">${esc(ev.def.name)}</span>`).join(' ') : '<span class="pending">None yet</span>'}</td></tr>`
     ).join('') + '</tbody>';
 }
 

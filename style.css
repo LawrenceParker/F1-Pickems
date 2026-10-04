@@ -73,12 +73,8 @@ th.player, td.player { position: sticky; left: 0; background: var(--panel); }
   transition: transform .15s ease; animation: rise .4s ease backwards; animation-delay: calc(var(--i) * 40ms); }
 .card:hover { transform: translateY(-2px); }
 .card.locked { border-top-color: var(--line); }
-.card.locked .badge { filter: grayscale(1); opacity: .55; }
-.card-top { display: flex; gap: 12px; align-items: center; }
 .card h3 { margin: 0; font-size: 1rem; }
 .card p { margin: 0; color: var(--muted); font-size: .9rem; }
-.badge { flex: none; width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center; font-size: 1.35rem;
-  background: color-mix(in srgb, var(--c) 16%, transparent); box-shadow: inset 0 0 0 2px var(--c); }
 .meter { height: 4px; border-radius: 2px; background: var(--line); overflow: hidden; }
 .meter i { display: block; height: 100%; background: var(--c); }
 .meta { color: var(--muted); font-size: .8rem; }
@@ -86,8 +82,6 @@ th.player, td.player { position: sticky; left: 0; background: var(--panel); }
 .chip { background: var(--chip); border-radius: 12px; padding: 1px 10px; font-size: .9rem; }
 .chip small { color: var(--muted); }
 td.chipcell { white-space: normal; }
-.mini { display: inline-grid; place-items: center; width: 28px; height: 28px; margin-right: 4px; border-radius: 50%;
-  background: var(--chip); font-size: .95rem; }
 @keyframes rise { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
 body.seen .card { animation: none; }
 @media (prefers-reduced-motion: reduce) { .card { animation: none; transition: none; } }
