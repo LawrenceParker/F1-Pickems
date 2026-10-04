@@ -73,7 +73,6 @@ th.player, td.player { position: sticky; left: 0; background: var(--panel); }
 .player-block { margin-top: 28px; }
 .player-block h2 { display: flex; align-items: baseline; gap: 10px; margin: 0 0 10px; }
 .player-block h2 small { color: var(--muted); font-weight: 400; font-size: .85rem; }
-.todo { color: var(--muted); font-size: .85rem; margin: 10px 0 0; }
 .cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 12px; }
 .card { --c: var(--tier-single); display: flex; flex-direction: column; gap: 6px; padding: 14px 16px;
   background: color-mix(in srgb, var(--c) 7%, var(--panel)); border: 1px solid var(--line); border-top: 3px solid var(--c); border-radius: 8px;
@@ -83,6 +82,10 @@ th.player, td.player { position: sticky; left: 0; background: var(--panel); }
 .card.tier-2 { --c: var(--tier-2); }
 .card.tier-3 { --c: var(--tier-3); }
 .card.tier-4 { --c: var(--tier-4); }
+.card.locked { --c: var(--line); background: var(--panel); }
+.card.locked:hover { transform: none; }
+.card.locked h3 { color: var(--muted); }
+.card.locked .meta { color: var(--muted); font-weight: 400; }
 .card h3 { margin: 0; font-size: 1rem; }
 .card p { margin: 0; color: var(--muted); font-size: .9rem; flex: 1; }
 .card .meta { color: var(--c); font-size: .8rem; font-weight: 600; }
