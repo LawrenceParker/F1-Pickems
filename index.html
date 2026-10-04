@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>F1 Pick'em Leaderboard</title>
+<style>
+  :root {
+    --bg: #f6f6f4; --panel: #ffffff; --text: #1c1c1e; --muted: #6b6b70;
+    --line: #dcdcd8; --accent: #c8102e; --warn: #9a6700; --warn-bg: #fff4d6;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #151517; --panel: #1e1e21; --text: #ececee; --muted: #9a9aa0;
+      --line: #333338; --accent: #ff4d63; --warn: #f0c040; --warn-bg: #3a3118;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+    font: 16px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  main { max-width: 960px; margin: 0 auto; padding: 24px 16px 48px; }
+  h1 { font-size: 1.6rem; margin: 0 0 4px; }
+  h2 { font-size: 1.15rem; margin: 32px 0 8px; }
+  .sub { color: var(--muted); margin: 0 0 16px; }
+  .bar { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; margin-bottom: 8px; }
+  select { font: inherit; padding: 4px 8px; background: var(--panel); color: var(--text);
+    border: 1px solid var(--line); border-radius: 4px; }
+  .wrap { overflow-x: auto; background: var(--panel); border: 1px solid var(--line); border-radius: 6px; }
+  table { border-collapse: collapse; width: 100%; }
+  th, td { padding: 8px 12px; text-align: left; border-bottom: 1px solid var(--line); white-space: nowrap; }
+  tr:last-child td { border-bottom: 0; }
+  th { font-weight: 600; color: var(--muted); font-size: .85rem; }
+  th small { display: block; font-weight: 400; }
+  td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+  td.rank { width: 3rem; color: var(--muted); }
+  .lead td { font-weight: 600; }
+  .lead td.rank { color: var(--accent); }
+  .cell .drv { font-weight: 600; }
+  .cell .pts { color: var(--muted); margin-left: 6px; font-variant-numeric: tabular-nums; }
+  .pending { color: var(--muted); }
+  .flag { background: var(--warn-bg); color: var(--warn); border-radius: 3px; padding: 0 4px; }
+  .status { color: var(--muted); font-size: .85rem; margin-top: 8px; }
+  .error { color: var(--accent); }
+  th.player, td.player { position: sticky; left: 0; background: var(--panel); }
+</style>
+</head>
+<body>
+<main>
+  <h1>F1 Pick'em Leaderboard</h1>
+  <p class="sub" id="sub">Loading…</p>
+  <div class="bar" id="bar" hidden>
+    <label for="season">Season</label>
+    <select id="season"></select>
+  </div>
+
+  <h2>Overall</h2>
+  <div class="wrap"><table id="overall"></table></div>
+
+  <h2>Round by round</h2>
+  <div class="wrap"><table id="rounds"></table></div>
+
+  <p class="status" id="status"></p>
+</main>
+
+<script>
+// Settings only. All players, picks and rounds come from picks.csv.
+const PICKS_CSV = 'picks.csv';
+const API = 'https://api.jolpi.ca/ergast/f1';
+const INCLUDE_SPRINT_POINTS = true;   // add sprint points to the driver's total for that round
+const CACHE_PREFIX = 'f1pickems:';
+
+const $ = id => document.getElementById(id);
+const norm = s => String(s).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]/g, '');
+const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+function parseCSV(text) {
+  const rows = []; let row = [], cur = '', q = false;
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (q) {
+      if (c === '"' && text[i + 1] === '"') { cur += '"'; i++; }
+      else if (c === '"') q = false;
+      else cur += c;
+    } else if (c === '"') q = true;
+    else if (c === ',') { row.push(cur); cur = ''; }
+    else if (c === '\n' || c === '\r') {
+      if (c === '\r' && text[i + 1] === '\n') i++;
+      row.push(cur); cur = '';
+      if (row.some(v => v.trim() !== '')) rows.push(row);
+      row = [];
+    } else cur += c;
+  }
+  row.push(cur);
+  if (row.some(v => v.trim() !== '')) rows.push(row);
+  const head = rows.shift().map(h => h.trim().toLowerCase());
+  return rows.map(r => Object.fromEntries(head.map((h, i) => [h, (r[i] || '').trim()])));
+}
+
+async function getJSON(url) {
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(url + ' returned ' + res.status);
+  return res.json();
+}
+
+// Returns { race, points: Map(lookupKey -> points) } or { pending: true }
+async function loadRound(season, round) {
+  const key = CACHE_PREFIX + season + ':' + round + ':' + INCLUDE_SPRINT_POINTS;
+  try { const hit = localStorage.getItem(key); if (hit) { const o = JSON.parse(hit); return { race: o.race, points: new Map(o.points) }; } } catch (e) {}
+
+  const data = await getJSON(`${API}/${season}/${round}/results.json`);
+  const race = data.MRData.RaceTable.Races[0];
+  if (!race || !race.Results || !race.Results.length) return { pending: true };
+
+  const points = new Map();
+  const add = (r, p) => {
+    const d = r.Driver;
+    const keys = [d.code, d.driverId, d.familyName, d.givenName + d.familyName, d.permanentNumber].filter(Boolean).map(norm);
+    keys.forEach(k => points.set(k, (points.get(k) || 0) + p));
+  };
+  race.Results.forEach(r => add(r, Number(r.points) || 0));
+
+  if (INCLUDE_SPRINT_POINTS) {
+    await sleep(250);
+    const sp = await getJSON(`${API}/${season}/${round}/sprint.json`);
+    const sprint = sp.MRData.RaceTable.Races[0];
+    if (sprint && sprint.SprintResults) sprint.SprintResults.forEach(r => add(r, Number(r.points) || 0));
+  }
+
+  const out = { race: race.raceName, points };
+  try { localStorage.setItem(key, JSON.stringify({ race: out.race, points: [...points] })); } catch (e) {}
+  return out;
+}
+
+function render(season, picks, results) {
+  const rounds = [...new Set(picks.map(p => Number(p.round)))].sort((a, b) => a - b);
+  const players = [...new Set(picks.map(p => p.player))];
+
+  const table = {};   // player -> round -> { driver, pts, state }
+  players.forEach(pl => table[pl] = {});
+  picks.forEach(p => {
+    const res = results[Number(p.round)];
+    let cell = { driver: p.driver, pts: 0, state: 'pending' };
+    if (res && !res.pending) {
+      const pts = res.points.get(norm(p.driver));
+      cell = pts === undefined ? { driver: p.driver, pts: 0, state: 'missing' } : { driver: p.driver, pts, state: 'ok' };
+    }
+    table[p.player][Number(p.round)] = cell;
+  });
+
+  const totals = players.map(pl => ({
+    player: pl,
+    pts: rounds.reduce((s, r) => s + ((table[pl][r] && table[pl][r].pts) || 0), 0)
+  })).sort((a, b) => b.pts - a.pts || a.player.localeCompare(b.player));
+
+  let rank = 0, prev = null;
+  $('overall').innerHTML =
+    '<thead><tr><th>Rank</th><th>Player</th><th class="num">Points</th></tr></thead><tbody>' +
+    totals.map((t, i) => {
+      if (t.pts !== prev) { rank = i + 1; prev = t.pts; }
+      return `<tr class="${rank === 1 && t.pts > 0 ? 'lead' : ''}"><td class="rank">${rank}</td><td>${esc(t.player)}</td><td class="num">${t.pts}</td></tr>`;
+    }).join('') + '</tbody>';
+
+  const head = rounds.map(r => {
+    const res = results[r];
+    const name = res && res.race ? res.race : (res && res.pending ? 'Not yet raced' : '');
+    return `<th>Round ${r}<small>${esc(name)}</small></th>`;
+  }).join('');
+  $('rounds').innerHTML =
+    `<thead><tr><th class="player">Player</th>${head}<th class="num">Total</th></tr></thead><tbody>` +
+    totals.map(t => {
+      const cells = rounds.map(r => {
+        const c = table[t.player][r];
+        if (!c) return '<td class="pending">–</td>';
+        if (c.state === 'pending') return `<td class="cell"><span class="drv">${esc(c.driver)}</span><span class="pts pending">pending</span></td>`;
+        if (c.state === 'missing') return `<td class="cell"><span class="drv">${esc(c.driver)}</span><span class="pts">0</span> <span class="flag" title="Driver not found in this race's results">not in results</span></td>`;
+        return `<td class="cell"><span class="drv">${esc(c.driver)}</span><span class="pts">${c.pts}</span></td>`;
+      }).join('');
+      return `<tr><td class="player">${esc(t.player)}</td>${cells}<td class="num">${t.pts}</td></tr>`;
+    }).join('') + '</tbody>';
+}
+
+async function show(season, allPicks) {
+  const picks = allPicks.filter(p => p.season === season);
+  const rounds = [...new Set(picks.map(p => Number(p.round)))].sort((a, b) => a - b);
+  $('sub').textContent = `${season} season`;
+  $('status').textContent = 'Fetching race results…';
+  $('status').classList.remove('error');
+
+  const results = {};
+  render(season, picks, results);            // show picks immediately, fill in points as they arrive
+  for (const r of rounds) {
+    try { results[r] = await loadRound(season, r); }
+    catch (e) { $('status').textContent = 'Could not load round ' + r + ' results: ' + e.message; $('status').classList.add('error'); results[r] = { pending: true }; }
+    render(season, picks, results);
+    await sleep(250);                        // stay under the API's rate limit
+  }
+  if (!$('status').classList.contains('error')) $('status').textContent = 'Results from the Jolpica F1 API. Updated ' + new Date().toLocaleString() + '.';
+}
+
+(async function init() {
+  try {
+    const res = await fetch(PICKS_CSV + '?t=' + Date.now());
+    if (!res.ok) throw new Error(PICKS_CSV + ' returned ' + res.status);
+    const picks = parseCSV(await res.text()).filter(p => p.season && p.round && p.player && p.driver);
+    if (!picks.length) { $('sub').textContent = 'No picks found in ' + PICKS_CSV + '.'; return; }
+
+    const seasons = [...new Set(picks.map(p => p.season))].sort().reverse();
+    if (seasons.length > 1) {
+      $('bar').hidden = false;
+      $('season').innerHTML = seasons.map(s => `<option>${esc(s)}</option>`).join('');
+      $('season').onchange = e => show(e.target.value, picks);
+    }
+    show(seasons[0], picks);
+  } catch (e) {
+    $('sub').textContent = 'Could not load the page data.';
+    $('status').textContent = e.message + '. If you opened this file directly, serve it from a web server or GitHub Pages instead.';
+    $('status').classList.add('error');
+  }
+})();
+</script>
+</body>
+</html>
