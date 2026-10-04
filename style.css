@@ -2,7 +2,7 @@
   --bg: #f6f6f4; --panel: #ffffff; --text: #1c1c1e; --muted: #6b6b70;
   --line: #dcdcd8; --accent: #c8102e; --warn: #9a6700; --warn-bg: #fff4d6; --chip: #eeeeea;
   --good: #1a7f37; --bad: #c62828; --max: #7b3fe4;
-  --tier-1: #b8743a; --tier-2: #7d8791; --tier-3: #c9971a; --tier-4: #2a9fd6; --tier-single: #5b6cff;
+  --tier-1: #0070dd; --tier-2: #a335ee; --tier-3: #ff8000; --tier-4: #B6184F; --tier-single: #e0e7dd;
 }
 @media (prefers-color-scheme: dark) {
   :root {
