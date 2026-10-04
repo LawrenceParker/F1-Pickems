@@ -9,7 +9,7 @@
     --bg: #151517; --panel: #1e1e21; --text: #ececee; --muted: #9a9aa0;
     --line: #333338; --accent: #ff4d63; --warn: #f0c040; --warn-bg: #3a3118; --chip: #2a2a2e;
     --good: #4cc26b; --bad: #ff6b6b; --max: #b794f6;
-    --tier-1: #d08a52; --tier-2: #aeb6bf; --tier-3: #e3b341; --tier-4: #4cc2f0; --tier-single: #8c98ff;
+    --tier-1: #0070dd; --tier-2: #a335ee; --tier-3: #ff8000; --tier-4: #B6184F; --tier-single: #e0e7dd;
   }
 }
 * { box-sizing: border-box; }
