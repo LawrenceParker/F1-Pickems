@@ -19,7 +19,7 @@
     <select id="season"></select>
   </div>
 
-  <h2>Achievements</h2>
+  <div class="summary" id="summary"></div>
   <div id="list"></div>
 
   <h2>By player</h2>
@@ -31,31 +31,52 @@
 <script src="shared.js"></script>
 <script>
 let defs = [];
+let lastList = '';
+const hue = i => Math.round((i * 137.5) % 360);
+const iconOf = d => esc(d.icon || (d.name || '?').trim().charAt(0).toUpperCase());
 
 function render(model) {
   const evals = evaluateAchievements(model, defs);
+  const total = model.players.length || 1;
 
-  $('list').innerHTML = evals.length
-    ? '<ul class="ach">' + evals.map(ev => {
-        const body = ev.error
+  const counts = model.totals.map(t => ({
+    player: t.player,
+    mine: evals.filter(ev => ev.holders.some(h => h.player === t.player))
+  }));
+  const best = [...counts].sort((a, b) => b.mine.length - a.mine.length)[0];
+  const unlocked = evals.filter(ev => ev.holders.length).length;
+
+  $('summary').innerHTML = evals.length
+    ? `<span><strong>${unlocked}</strong> of ${evals.length} unlocked</span>` +
+      (best && best.mine.length ? `<span class="pending">Most achievements: ${esc(best.player)} (${best.mine.length})</span>` : '')
+    : '';
+
+  const listHtml = evals.length
+    ? '<div class="cards">' + evals.map((ev, i) => {
+        const n = ev.holders.length;
+        const chips = ev.error
           ? `<span class="flag">${esc(ev.error)}</span>`
-          : ev.holders.length
+          : n
             ? ev.holders.map(h => `<span class="chip">${esc(h.player)}${h.at ? ` <small>${esc(h.at)}</small>` : ''}</span>`).join('')
             : '<span class="pending">Not earned yet</span>';
-        return `<li><div class="ach-head"><strong>${esc(ev.def.name)}</strong>` +
-          `<span class="pending">${esc(ev.def.description || '')}</span>` +
-          `<span class="count">${ev.holders.length} of ${model.players.length}</span></div>` +
-          `<div class="chips">${body}</div></li>`;
-      }).join('') + '</ul>'
+        return `<article class="card ${n ? '' : 'locked'}" style="--h:${hue(i)};--i:${i}">` +
+          `<div class="card-top"><div class="badge" aria-hidden="true">${iconOf(ev.def)}</div>` +
+          `<div><h3>${esc(ev.def.name)}</h3><p>${esc(ev.def.description || '')}</p></div></div>` +
+          `<div class="chips">${chips}</div>` +
+          `<div class="meter" aria-hidden="true"><i style="width:${(n / total * 100).toFixed(0)}%"></i></div>` +
+          `<div class="meta">${n} of ${total} players</div></article>`;
+      }).join('') + '</div>'
     : `<p class="empty">No achievements yet. Add rows to ${FILES.achievements}.</p>`;
+  // Only touch the cards when they changed, so progressive loading doesn't replay the entrance.
+  if (listHtml !== lastList) { $('list').innerHTML = listHtml; lastList = listHtml; }
+  setTimeout(() => document.body.classList.add('seen'), 1000);
 
   $('byPlayer').innerHTML =
     '<thead><tr><th>Player</th><th class="num">Earned</th><th>Achievements</th></tr></thead><tbody>' +
-    model.totals.map(t => {
-      const mine = evals.filter(ev => ev.holders.some(h => h.player === t.player));
-      return `<tr><td>${esc(t.player)}</td><td class="num">${mine.length}</td>` +
-        `<td class="chipcell">${mine.length ? mine.map(ev => `<span class="chip">${esc(ev.def.name)}</span>`).join(' ') : '<span class="pending">None yet</span>'}</td></tr>`;
-    }).join('') + '</tbody>';
+    counts.map(c =>
+      `<tr><td>${esc(c.player)}</td><td class="num">${c.mine.length}</td>` +
+      `<td class="chipcell">${c.mine.length ? c.mine.map(ev => `<span class="mini" title="${esc(ev.def.name)}">${iconOf(ev.def)}</span>`).join('') : '<span class="pending">None yet</span>'}</td></tr>`
+    ).join('') + '</tbody>';
 }
 
 (async function init() {

@@ -2,13 +2,14 @@
 
 // ---------- Settings ----------
 const API = 'https://api.jolpi.ca/ergast/f1';
-const CACHE_PREFIX = 'f1pickems2:';
+const CACHE_PREFIX = 'f1pickems3:';
 // How the next pick order is ranked: 'last_round' (points from the latest race) or 'overall' (season total)
 const PICK_ORDER_BASIS = 'last_round';
 const FILES = {
   picks: 'picks.csv',
   scoring: 'scoring.csv',
   table: 'points_table.csv',
+  teams: 'teams.csv',
   achievements: 'achievements.csv'
 };
 // Sessions the page knows how to fetch. Adding one means adding its API path and result key here.
@@ -85,14 +86,15 @@ async function getJSON(url) {
 }
 
 async function loadData(extraFiles = []) {
-  const [picks, scoring, table] = await Promise.all([
-    loadCSV(FILES.picks), loadCSV(FILES.scoring), loadCSV(FILES.table, true)
+  const [picks, scoring, table, teams] = await Promise.all([
+    loadCSV(FILES.picks), loadCSV(FILES.scoring), loadCSV(FILES.table, true), loadCSV(FILES.teams, true)
   ]);
   const data = {
     picks: picks
       .filter(p => p.season && p.round && p.player && p.driver && !isNaN(Number(p.round)))
       .map(p => ({ ...p, round: String(Number(p.round)), session: (p.session || 'race').toLowerCase() })),
-    scoring, table
+    scoring, table,
+    teams: new Map(teams.filter(t => t.team && t.color).map(t => [norm(t.team), t.color]))
   };
   for (const name of extraFiles) data[name] = await loadCSV(FILES[name], true);
   return data;
@@ -143,6 +145,7 @@ async function loadSession(season, round, session) {
     const finished = status === 'Finished' || /^\+\d+ Laps?$/.test(status) || status === 'Lapped';
     return {
       keys: [d.code, d.driverId, d.familyName, d.givenName + d.familyName, d.permanentNumber].filter(Boolean).map(norm),
+      team: norm((r.Constructor || {}).constructorId || ''),
       position: Number(r.position),
       points: Number(r.points) || 0,
       laps: Number(r.laps) || 0,
@@ -208,7 +211,8 @@ function computeModel(season, data, results) {
           ? ((table.get(p.session) || new Map()).get(e.position) || 0)
           : e.points;
         if (e.position === 1 && isYes(rule.winner_zero)) pts = 0;
-        cell = { driver: p.driver, state: 'ok', pts, position: e.position, dnf: e.dnf, laps: e.laps };
+        cell = { driver: p.driver, state: 'ok', pts, position: e.position, dnf: e.dnf, laps: e.laps,
+                 color: data.teams.get(e.team) || '', maxPts: Number(rule.max_points) || 0 };
       }
     }
     cell.settled = cell.state === 'ok' || cell.state === 'missing';

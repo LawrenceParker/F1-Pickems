@@ -32,8 +32,8 @@
   <div class="bar">
     <label for="mode">Show</label>
     <select id="mode">
-      <option value="round">Points each round</option>
       <option value="cum">Running total</option>
+      <option value="round">Points each round</option>
     </select>
   </div>
   <div class="wrap">
@@ -140,14 +140,16 @@ function renderChart(model) {
 
 function cellHtml(c) {
   if (!c) return '<td class="pending">–</td>';
-  const d = `<span class="drv">${esc(c.driver)}</span>`;
-  if (c.state === 'pending') return `<td class="cell">${d}<span class="pts">pending</span></td>`;
-  if (c.state === 'noscoring') return `<td class="cell">${d} <span class="flag">no scoring rule</span></td>`;
-  if (c.state === 'missing') return `<td class="cell">${d}<span class="pts">0</span> <span class="flag" title="Driver not found in these results">not in results</span></td>`;
+  const plain = `<span class="drv">${esc(c.driver)}</span>`;
+  if (c.state === 'pending') return `<td class="cell">${plain}<span class="pts">pending</span></td>`;
+  if (c.state === 'noscoring') return `<td class="cell">${plain} <span class="flag">no scoring rule</span></td>`;
+  if (c.state === 'missing') return `<td class="cell">${plain}<span class="pts pts-zero">0</span> <span class="flag" title="Driver not found in these results">not in results</span></td>`;
+  const drv = `<span class="drv"${c.color ? ` style="color:${esc(c.color)}"` : ''}>${esc(c.driver)}</span>`;
+  const cls = c.maxPts && c.pts >= c.maxPts ? 'pts-max' : c.pts > 0 ? 'pts-pos' : 'pts-zero';
   let tags = '';
   if (c.position === 1) tags += '<span class="tag" title="Finished first">winner</span>';
   if (c.dnf) tags += '<span class="tag" title="Did not finish">DNF</span>';
-  return `<td class="cell">${d}<span class="pts">${c.pts}</span>${tags}</td>`;
+  return `<td class="cell">${drv}<span class="pts ${cls}">${c.pts}</span>${tags}</td>`;
 }
 
 function renderRounds(model) {
