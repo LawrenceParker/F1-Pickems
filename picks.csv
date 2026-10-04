@@ -1,7 +1,7 @@
-season,round,player,driver
-2026,1,Lawrence,VER
-2026,1,Alex,NOR
-2026,1,Conor,LEC
-2026,2,Lawrence,RUS
-2026,2,Conor,HAM
-2026,2,Alex,PIA
+season,round,player,driver,session
+2026,1,Player One,VER,race
+2026,1,Player Two,NOR,race
+2026,1,Player Three,LEC,race
+2026,2,Player One,RUS,race
+2026,2,Player Two,HAM,race
+2026,2,Player Three,PIA,race

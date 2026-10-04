@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>F1 Pick'em Achievements</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main>
+  <h1>F1 Pick'em</h1>
+  <nav>
+    <a href="index.html">Leaderboard</a>
+    <a href="achievements.html" aria-current="page">Achievements</a>
+  </nav>
+  <p class="sub" id="sub">Loading…</p>
+  <div class="bar" id="bar" hidden>
+    <label for="season">Season</label>
+    <select id="season"></select>
+  </div>
+
+  <h2>Achievements</h2>
+  <div id="list"></div>
+
+  <h2>By player</h2>
+  <div class="wrap"><table id="byPlayer"></table></div>
+
+  <p class="status" id="status"></p>
+</main>
+
+<script src="shared.js"></script>
+<script>
+let defs = [];
+
+function render(model) {
+  const evals = evaluateAchievements(model, defs);
+
+  $('list').innerHTML = evals.length
+    ? '<ul class="ach">' + evals.map(ev => {
+        const body = ev.error
+          ? `<span class="flag">${esc(ev.error)}</span>`
+          : ev.holders.length
+            ? ev.holders.map(h => `<span class="chip">${esc(h.player)}${h.at ? ` <small>${esc(h.at)}</small>` : ''}</span>`).join('')
+            : '<span class="pending">Not earned yet</span>';
+        return `<li><div class="ach-head"><strong>${esc(ev.def.name)}</strong>` +
+          `<span class="pending">${esc(ev.def.description || '')}</span>` +
+          `<span class="count">${ev.holders.length} of ${model.players.length}</span></div>` +
+          `<div class="chips">${body}</div></li>`;
+      }).join('') + '</ul>'
+    : `<p class="empty">No achievements yet. Add rows to ${FILES.achievements}.</p>`;
+
+  $('byPlayer').innerHTML =
+    '<thead><tr><th>Player</th><th class="num">Earned</th><th>Achievements</th></tr></thead><tbody>' +
+    model.totals.map(t => {
+      const mine = evals.filter(ev => ev.holders.some(h => h.player === t.player));
+      return `<tr><td>${esc(t.player)}</td><td class="num">${mine.length}</td>` +
+        `<td class="chipcell">${mine.length ? mine.map(ev => `<span class="chip">${esc(ev.def.name)}</span>`).join(' ') : '<span class="pending">None yet</span>'}</td></tr>`;
+    }).join('') + '</tbody>';
+}
+
+(async function init() {
+  try {
+    const data = await loadData(['achievements']);
+    defs = data.achievements;
+    initSeasonSelect(data.picks, season => {
+      $('sub').textContent = season + ' season';
+      runSeason(season, data, render, setStatus);
+    });
+  } catch (e) { showFatal(e); }
+})();
+</script>
+</body>
+</html>
