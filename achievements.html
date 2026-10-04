@@ -31,7 +31,7 @@ let defs = [];
 let lastList = '';
 
 // The "tier" column in achievements.csv sets the card colour: 1-4, or bronze / silver / gold / diamond.
-const TIER_NAMES = ['Bronze', 'Silver', 'Gold', 'Diamond'];
+const TIER_NAMES = ['Rare', 'Legendary', 'Epic', 'Diamond'];
 const TIER_ALIASES = { bronze: 1, silver: 2, gold: 3, diamond: 4, platinum: 4 };
 function tierOf(def) {
   const v = (def.tier || '').trim().toLowerCase();
