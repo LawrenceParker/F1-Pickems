@@ -140,16 +140,17 @@ function renderChart(model) {
 
 function cellHtml(c) {
   if (!c) return '<td class="pending">–</td>';
+  const row = inner => `<td class="cell"><div class="cellrow">${inner}</div></td>`;
   const plain = `<span class="drv">${esc(c.driver)}</span>`;
-  if (c.state === 'pending') return `<td class="cell">${plain}<span class="pts">pending</span></td>`;
-  if (c.state === 'noscoring') return `<td class="cell">${plain} <span class="flag">no scoring rule</span></td>`;
-  if (c.state === 'missing') return `<td class="cell">${plain}<span class="pts pts-zero">0</span> <span class="flag" title="Driver not found in these results">not in results</span></td>`;
+  if (c.state === 'pending') return row(`${plain}<span class="pill">pending</span>`);
+  if (c.state === 'noscoring') return row(`${plain}<span class="flag">no scoring rule</span>`);
+  if (c.state === 'missing') return row(`${plain}<span class="pill pts-zero">0</span><span class="flag" title="Driver not found in these results">not in results</span>`);
   const drv = `<span class="drv"${c.color ? ` style="color:${esc(c.color)}"` : ''}>${esc(c.driver)}</span>`;
   const cls = c.maxPts && c.pts >= c.maxPts ? 'pts-max' : c.pts > 0 ? 'pts-pos' : 'pts-zero';
   let tags = '';
   if (c.position === 1) tags += '<span class="tag" title="Finished first">winner</span>';
   if (c.dnf) tags += '<span class="tag" title="Did not finish">DNF</span>';
-  return `<td class="cell">${drv}<span class="pts ${cls}">${c.pts}</span>${tags}</td>`;
+  return row(`${drv}<span class="pill ${cls}">${c.pts}</span>${tags}`);
 }
 
 function renderRounds(model) {

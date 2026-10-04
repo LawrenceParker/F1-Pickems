@@ -80,7 +80,7 @@ async function loadCSV(path, optional = false) {
 }
 
 async function getJSON(url) {
-  const res = await fetch(url);
+  const res = await fetch(url, { cache: 'no-cache' });   // always revalidate so fresh results show up
   if (!res.ok) throw new Error(url + ' returned ' + res.status);
   return res.json();
 }

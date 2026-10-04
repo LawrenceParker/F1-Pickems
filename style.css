@@ -41,13 +41,15 @@ td.rank { width: 3rem; color: var(--muted); }
 th.player, td.player { position: sticky; left: 0; background: var(--panel); }
 
 .cell .drv { font-weight: 600; }
-.cell .pts { color: var(--muted); margin-left: 6px; font-variant-numeric: tabular-nums; }
-.cell .pts.pts-pos { color: var(--good); font-weight: 600; }
-.cell .pts.pts-zero { color: var(--bad); font-weight: 600; }
-.cell .pts.pts-max { color: var(--max); font-weight: 700; }
+.cellrow { display: flex; align-items: center; gap: 6px; }
+.pill { display: inline-block; min-width: 2rem; padding: 0 8px; text-align: center; line-height: 1.5; border-radius: 10px;
+  font-size: .85rem; font-variant-numeric: tabular-nums; color: var(--muted); background: var(--chip); }
+.pill.pts-pos { color: var(--good); font-weight: 600; background: color-mix(in srgb, var(--good) 15%, transparent); }
+.pill.pts-zero { color: var(--bad); font-weight: 600; background: color-mix(in srgb, var(--bad) 15%, transparent); }
+.pill.pts-max { color: var(--max); font-weight: 700; background: color-mix(in srgb, var(--max) 18%, transparent); }
 .pending { color: var(--muted); }
 .flag { background: var(--warn-bg); color: var(--warn); border-radius: 3px; padding: 0 4px; font-size: .85rem; }
-.tag { background: var(--chip); color: var(--muted); border-radius: 3px; padding: 0 4px; font-size: .8rem; margin-left: 4px; }
+.tag { color: var(--muted); border: 1px solid var(--line); border-radius: 4px; padding: 0 5px; font-size: .75rem; line-height: 1.4; }
 .status { color: var(--muted); font-size: .85rem; margin-top: 12px; }
 .error { color: var(--accent); }
 .empty { color: var(--muted); padding: 12px; margin: 0; }
