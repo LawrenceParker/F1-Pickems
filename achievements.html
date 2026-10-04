@@ -22,9 +22,6 @@
   <div class="summary" id="summary"></div>
   <div id="list"></div>
 
-  <h2>By player</h2>
-  <div class="wrap"><table id="byPlayer"></table></div>
-
   <p class="status" id="status"></p>
 </main>
 
@@ -32,49 +29,57 @@
 <script>
 let defs = [];
 let lastList = '';
-const hue = i => Math.round((i * 137.5) % 360);
+
+// Tiers: rows whose names end in a numeral ("First Equals Last I", "... II") form one group, in CSV order.
+// An optional "group" column in achievements.csv overrides this.
+const groupOf = d => (d.group || d.name.replace(/\s+(?:[IVX]{1,6}|\d{1,2})$/, '')).trim();
+const tierClass = (idx, size) => size < 2 ? '' : 'tier-' + Math.min(idx + 1, 4);
 
 function render(model) {
   const evals = evaluateAchievements(model, defs);
-  const total = model.players.length || 1;
+  const groups = new Map();
+  evals.forEach(ev => {
+    const g = groupOf(ev.def);
+    if (!groups.has(g)) groups.set(g, []);
+    groups.get(g).push(ev);
+  });
+  const list = [...groups.entries()].map(([name, tiers]) => ({ name, tiers }));
 
-  const counts = model.totals.map(t => ({
-    player: t.player,
-    mine: evals.filter(ev => ev.holders.some(h => h.player === t.player))
-  }));
-  const best = [...counts].sort((a, b) => b.mine.length - a.mine.length)[0];
-  const unlocked = evals.filter(ev => ev.holders.length).length;
+  // Key to the tier colours
+  const maxTiers = Math.min(4, Math.max(1, ...list.map(g => g.tiers.length)));
+  let key = '';
+  if (maxTiers > 1) {
+    for (let t = 1; t <= maxTiers; t++) key += `<span class="key"><i style="background:var(--tier-${t})"></i>Tier ${t}${t === 4 && list.some(g => g.tiers.length > 4) ? '+' : ''}</span>`;
+    if (list.some(g => g.tiers.length === 1)) key += '<span class="key"><i style="background:var(--tier-single)"></i>No tiers</span>';
+  }
+  const errors = evals.filter(ev => ev.error).map(ev => `<span class="flag">${esc(ev.def.name)}: ${esc(ev.error)}</span>`).join('');
+  $('summary').innerHTML = key + errors;
 
-  $('summary').innerHTML = evals.length
-    ? `<span><strong>${unlocked}</strong> of ${evals.length} unlocked</span>` +
-      (best && best.mine.length ? `<span class="pending">Most achievements: ${esc(best.player)} (${best.mine.length})</span>` : '')
-    : '';
-
-  const listHtml = evals.length
-    ? '<div class="cards">' + evals.map((ev, i) => {
-        const n = ev.holders.length;
-        const chips = ev.error
-          ? `<span class="flag">${esc(ev.error)}</span>`
-          : n
-            ? ev.holders.map(h => `<span class="chip">${esc(h.player)}${h.at ? ` <small>${esc(h.at)}</small>` : ''}</span>`).join('')
-            : '<span class="pending">Not earned yet</span>';
-        return `<article class="card ${n ? '' : 'locked'}" style="--h:${hue(i)};--i:${i}">` +
-          `<div><h3>${esc(ev.def.name)}</h3><p>${esc(ev.def.description || '')}</p></div>` +
-          `<div class="chips">${chips}</div>` +
-          `<div class="meter" aria-hidden="true"><i style="width:${(n / total * 100).toFixed(0)}%"></i></div>` +
-          `<div class="meta">${n} of ${total} players</div></article>`;
-      }).join('') + '</div>'
+  const html = list.length
+    ? model.totals.map(t => {
+        const earned = [], todo = [];
+        list.forEach(g => {
+          let top = -1;
+          g.tiers.forEach((ev, i) => { if (ev.holders.some(h => h.player === t.player)) top = i; });
+          if (top < 0) todo.push(g.name);
+          else earned.push({ g, top, ev: g.tiers[top], at: g.tiers[top].holders.find(h => h.player === t.player).at });
+        });
+        const cards = earned.map((e, i) => {
+          const size = e.g.tiers.length;
+          return `<article class="card ${tierClass(e.top, size)}" style="--i:${i}">` +
+            `<h3>${esc(e.ev.def.name)}</h3><p>${esc(e.ev.def.description || '')}</p>` +
+            `<div class="meta">${size > 1 ? `Tier ${e.top + 1} of ${size}` : 'Earned'}${e.at ? ` · ${esc(e.at)}` : ''}</div></article>`;
+        }).join('');
+        return `<section class="player-block"><h2>${esc(t.player)}<small>${earned.length} of ${list.length} achievements</small></h2>` +
+          (cards ? `<div class="cards">${cards}</div>` : '<p class="todo">No achievements yet.</p>') +
+          (todo.length ? `<p class="todo">To unlock: ${todo.map(esc).join(', ')}</p>` : '') +
+          '</section>';
+      }).join('')
     : `<p class="empty">No achievements yet. Add rows to ${FILES.achievements}.</p>`;
-  // Only touch the cards when they changed, so progressive loading doesn't replay the entrance.
-  if (listHtml !== lastList) { $('list').innerHTML = listHtml; lastList = listHtml; }
-  setTimeout(() => document.body.classList.add('seen'), 1000);
 
-  $('byPlayer').innerHTML =
-    '<thead><tr><th>Player</th><th class="num">Earned</th><th>Achievements</th></tr></thead><tbody>' +
-    counts.map(c =>
-      `<tr><td>${esc(c.player)}</td><td class="num">${c.mine.length}</td>` +
-      `<td class="chipcell">${c.mine.length ? c.mine.map(ev => `<span class="chip">${esc(ev.def.name)}</span>`).join(' ') : '<span class="pending">None yet</span>'}</td></tr>`
-    ).join('') + '</tbody>';
+  // Only touch the cards when they changed, so progressive loading doesn't replay the entrance.
+  if (html !== lastList) { $('list').innerHTML = html; lastList = html; }
+  setTimeout(() => document.body.classList.add('seen'), 1000);
 }
 
 (async function init() {
@@ -83,6 +88,7 @@ function render(model) {
     defs = data.achievements;
     initSeasonSelect(data.picks, season => {
       $('sub').textContent = season + ' season';
+      lastList = '';
       runSeason(season, data, render, setStatus);
     });
   } catch (e) { showFatal(e); }
