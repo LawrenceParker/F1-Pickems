@@ -3,8 +3,8 @@ first-is-last1,First Equals Last I,Pick the driver who comes first,picked_winner
 first-is-last2,First Equals Last II,Pick the driver who comes first 3 times,picked_winner,,3,,race,,common
 first-is-last3,First Equals Last III,Pick the driver who comes first 5 times,picked_winner,,5,,race,,rare
 zero,Zero Pointer I,Get zero points in a week,zero_points,,1,,race,,common
-zero-x3,Zero Pointer II,Score 0 points in 3 consecutive rounds,zero_points,,3,yes,race,,epic
-zero-x5,Zero Pointer III,Score 0 points in 5 consecutive rounds,zero_points,,5,yes,race,,legendary
+zero-x3,Zero Pointer II,Score 0 points in 3 consecutive rounds,zero_points,,3,yes,race,,legendary
+zero-x5,Zero Pointer III,Score 0 points in 5 consecutive rounds,zero_points,,5,yes,race,,epic
 on-the-box1,On the box I,Pick a driver who finishes on the podium,picked_podium,,1,,race,,common
 on-the-box2,On the box II,Pick a driver who finishes on the podium 3 times,picked_podium,,3,,race,,common
 on-the-box3,On the box III,Pick a driver who finishes on the podium 5 times,picked_podium,,5,,race,,rare
