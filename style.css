@@ -2,14 +2,15 @@
   --bg: #f6f6f4; --panel: #ffffff; --text: #1c1c1e; --muted: #6b6b70;
   --line: #dcdcd8; --accent: #c8102e; --warn: #9a6700; --warn-bg: #fff4d6; --chip: #eeeeea;
   --good: #1a7f37; --bad: #c62828; --max: #7b3fe4;
-  --tier-1: #2f9e6f; --tier-2: #2a7fd6; --tier-3: #8b5cf6; --tier-4: #d98a00; --tier-single: #5b6cff;
+  /* Achievement rarity colours: change these to restyle the cards */
+  --common: #2f9e6f; --rare: #2a7fd6; --legendary: #8b5cf6; --epic: #d98a00; --no-rarity: #5b6cff;
 }
 @media (prefers-color-scheme: dark) {
   :root {
     --bg: #151517; --panel: #1e1e21; --text: #ececee; --muted: #9a9aa0;
     --line: #333338; --accent: #ff4d63; --warn: #f0c040; --warn-bg: #3a3118; --chip: #2a2a2e;
     --good: #4cc26b; --bad: #ff6b6b; --max: #b794f6;
-    --tier-1: #4cc28f; --tier-2: #5aa2f0; --tier-3: #b794f6; --tier-4: #f0b429; --tier-single: #8c98ff;
+    --common: #4cc28f; --rare: #5aa2f0; --legendary: #b794f6; --epic: #f0b429; --no-rarity: #8c98ff;
   }
 }
 * { box-sizing: border-box; }
@@ -74,14 +75,14 @@ th.player, td.player { position: sticky; left: 0; background: var(--panel); }
 .player-block h2 { display: flex; align-items: baseline; gap: 10px; margin: 0 0 10px; }
 .player-block h2 small { color: var(--muted); font-weight: 400; font-size: .85rem; }
 .cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 12px; }
-.card { --c: var(--tier-single); display: flex; flex-direction: column; gap: 6px; padding: 14px 16px;
+.card { --c: var(--no-rarity); display: flex; flex-direction: column; gap: 6px; padding: 14px 16px;
   background: color-mix(in srgb, var(--c) 7%, var(--panel)); border: 1px solid var(--line); border-top: 3px solid var(--c); border-radius: 8px;
   transition: transform .15s ease; animation: rise .4s ease backwards; animation-delay: calc(var(--i) * 40ms); }
 .card:hover { transform: translateY(-2px); }
-.card.tier-1 { --c: var(--tier-1); }
-.card.tier-2 { --c: var(--tier-2); }
-.card.tier-3 { --c: var(--tier-3); }
-.card.tier-4 { --c: var(--tier-4); }
+.card.common { --c: var(--common); }
+.card.rare { --c: var(--rare); }
+.card.legendary { --c: var(--legendary); }
+.card.epic { --c: var(--epic); }
 .card.locked { --c: var(--line); background: var(--panel); }
 .card.locked:hover { transform: none; }
 .card.locked h3 { color: var(--muted); }

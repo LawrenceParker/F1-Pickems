@@ -20,21 +20,51 @@ const SESSIONS = {
 };
 
 // ---------- Achievement conditions ----------
-// To add a new kind of achievement, add one line here, then use its name in the "condition" column of achievements.csv.
-// c = one player's result for one session: { pts, position, dnf, laps, slotMax }. t = the "threshold" column.
+// In achievements.csv the "condition" column can hold one condition or several joined with & (all must be true):
+//     picked_driver:VER & points_at_least:10
+// Put a session in front to look at another session in the same round:   qualifying.max_points & max_points
+// "name:value" passes a value to the condition. With no ":value", the "threshold" column is used instead.
+// To add a new kind of condition, add one line to ROUND_CONDITIONS (or SEASON_CONDITIONS) and use its name in the CSV.
+//   c = this player's result for the session: { pts, position, dnf, laps, slotMax, maxPts, driver, driverKey, keys, team }
+//   a = the value as text (use num(a) for a number)
+//   x = { player, slot, model, prev (their previous result in this session type), others (other players' results this session), cellOf(playerName) }
+const num = a => (a === '' || a === undefined) ? NaN : Number(a);
 const ROUND_CONDITIONS = {
-  picked_winner:   c => c.position === 1,
-  picked_podium:   c => c.position >= 1 && c.position <= 3,
-  picked_dnf:      c => c.dnf === true,
-  zero_points:     c => c.pts === 0,
-  points_at_least: (c, t) => c.pts >= t,
-  points_at_most:  (c, t) => c.pts <= t,
-  top_scorer:      c => c.pts > 0 && c.pts === c.slotMax
+  // the pick's result
+  picked_winner:    c => c.position === 1,
+  picked_podium:    c => c.position >= 1 && c.position <= 3,
+  position_at_most: (c, a) => c.position >= 1 && c.position <= num(a),
+  picked_dnf:       c => c.dnf === true,
+  // the points
+  zero_points:      c => c.pts === 0,
+  points_at_least:  (c, a) => c.pts >= num(a),
+  points_at_most:   (c, a) => c.pts <= num(a),
+  max_points:       c => c.maxPts > 0 && c.pts >= c.maxPts,        // max_points column in scoring.csv
+  // which driver or team was picked (driver: code, surname, full name or number; team: constructor id from teams.csv)
+  picked_driver:    (c, a) => c.keys.includes(norm(a)),
+  picked_team:      (c, a) => c.team === norm(a),
+  // compared with the other players
+  top_scorer:       c => c.pts > 0 && c.pts === c.slotMax,           // ties count
+  sole_top_scorer:  (c, a, x) => c.pts > 0 && x.others.every(o => o.pts < c.pts),
+  lowest_scorer:    (c, a, x) => x.others.length > 0 && x.others.every(o => o.pts >= c.pts),
+  beat_player:      (c, a, x) => { const o = x.cellOf(a); return !!o && c.pts > o.pts; },
+  // compared with their own previous round
+  more_than_previous:      (c, a, x) => !!x.prev && c.pts > x.prev.pts,
+  less_than_previous:      (c, a, x) => !!x.prev && c.pts < x.prev.pts,
+  same_driver_as_previous: (c, a, x) => !!x.prev && !!c.driverKey && c.driverKey === x.prev.driverKey
 };
-// Season-wide conditions return the label of the session where it was reached, or null.
+// Season-wide conditions return the label of the session where it was reached, or null. They can't be combined with &.
 const SEASON_CONDITIONS = {
-  total_points_at_least: (player, t, model) => {
-    for (const s of model.slots) if (s.done && model.cum[player][s.key] >= t) return s.label;
+  total_points_at_least: (player, a, model) => {
+    for (const s of model.slots) if (s.done && model.cum[player][s.key] >= num(a)) return s.label;
+    return null;
+  },
+  unique_drivers_at_least: (player, a, model) => {
+    const seen = new Set();
+    for (const s of model.slots) {
+      const c = model.cells[player][s.key];
+      if (c && c.settled && c.driverKey) { seen.add(c.driverKey); if (seen.size >= num(a)) return s.label; }
+    }
     return null;
   }
 };
@@ -204,7 +234,7 @@ function computeModel(season, data, results) {
     } else {
       const e = res.index.get(norm(p.driver));
       const rule = rules.get(p.session);
-      if (!e) cell = { driver: p.driver, state: 'missing', pts: 0 };
+      if (!e) cell = { driver: p.driver, state: 'missing', pts: 0, keys: [norm(p.driver)], team: '', driverKey: norm(p.driver) };
       else if (!rule) cell = { driver: p.driver, state: 'noscoring', pts: 0 };
       else {
         let pts = (rule.source || '').toLowerCase() === 'table'
@@ -212,7 +242,8 @@ function computeModel(season, data, results) {
           : e.points;
         if (e.position === 1 && isYes(rule.winner_zero)) pts = 0;
         cell = { driver: p.driver, state: 'ok', pts, position: e.position, dnf: e.dnf, laps: e.laps,
-                 color: data.teams.get(e.team) || '', maxPts: Number(rule.max_points) || 0 };
+                 color: data.teams.get(e.team) || '', maxPts: Number(rule.max_points) || 0,
+                 keys: e.keys, team: e.team, driverKey: e.keys[1] || e.keys[0] || '' };
       }
     }
     cell.settled = cell.state === 'ok' || cell.state === 'missing';
@@ -294,32 +325,69 @@ function pickOrder(model) {
 }
 
 // ---------- Achievements ----------
+function makeCtx(model, player, slot) {
+  const others = model.players.filter(p => p !== player)
+    .map(p => model.cells[p][slot.key]).filter(c => c && c.settled);
+  let prev = null;
+  for (const s of model.slots) {
+    if (s.session !== slot.session || s.round >= slot.round) continue;
+    const c = model.cells[player][s.key];
+    if (c && c.settled) prev = c;
+  }
+  const cellOf = name => {
+    const p = model.players.find(q => norm(q) === norm(name));
+    const c = p && model.cells[p][slot.key];
+    return c && c.settled ? c : null;
+  };
+  return { model, player, slot, prev, others, cellOf };
+}
+
+// "qualifying.max_points & picked_driver:VER"  ->  [{session:'qualifying', name:'max_points'}, {session:null, name:'picked_driver', arg:'VER'}]
+function parseCondition(text) {
+  return String(text).split('&').map(raw => {
+    let part = raw.trim(), session = null;
+    const dot = part.match(/^([a-z]+)\.(.+)$/i);
+    if (dot && SESSIONS[dot[1].toLowerCase()]) { session = dot[1].toLowerCase(); part = dot[2].trim(); }
+    const i = part.indexOf(':');
+    return { session, name: (i < 0 ? part : part.slice(0, i)).trim(), arg: i < 0 ? undefined : part.slice(i + 1).trim() };
+  });
+}
+
 function evaluateAchievements(model, defs) {
   return defs.filter(d => d.name && d.condition).map(def => {
-    const cond = def.condition.trim();
-    const t = def.threshold === '' || def.threshold === undefined ? undefined : Number(def.threshold);
     const times = Number(def.times) || 1;
     const streak = isYes(def.streak);
     const sess = (def.session || 'race').toLowerCase();
     const holders = [];
+    const parts = parseCondition(def.condition);
+    const argOf = p => p.arg !== undefined ? p.arg : (def.threshold || '');
 
-    if (SEASON_CONDITIONS[cond]) {
+    if (parts.length === 1 && !parts[0].session && SEASON_CONDITIONS[parts[0].name]) {
       model.totals.forEach(tot => {
-        const at = SEASON_CONDITIONS[cond](tot.player, t, model);
+        const at = SEASON_CONDITIONS[parts[0].name](tot.player, argOf(parts[0]), model);
         if (at) holders.push({ player: tot.player, at });
       });
       return { def, holders };
     }
-    const test = ROUND_CONDITIONS[cond];
-    if (!test) return { def, holders, error: `Unknown condition "${cond}"` };
+    const bad = parts.find(p => !ROUND_CONDITIONS[p.name]);
+    if (bad) {
+      return { def, holders, error: SEASON_CONDITIONS[bad.name]
+        ? `"${bad.name}" can't be combined with other conditions`
+        : `Unknown condition "${bad.name}"` };
+    }
 
     model.totals.forEach(tot => {
       let run = 0, count = 0, at = null;
       for (const s of model.slots) {
         if (sess !== 'any' && s.session !== sess) continue;
-        const c = model.cells[tot.player][s.key];
-        if (!c || !c.settled) continue;
-        if (test(c, t)) { run++; count++; } else run = 0;
+        const own = model.cells[tot.player][s.key];
+        if (!own || !own.settled) continue;
+        const ok = parts.every(p => {
+          const slot = p.session ? model.slots.find(z => z.round === s.round && z.session === p.session) : s;
+          const c = slot && model.cells[tot.player][slot.key];
+          return !!c && c.settled && !!ROUND_CONDITIONS[p.name](c, argOf(p), makeCtx(model, tot.player, slot));
+        });
+        if (ok) { run++; count++; } else run = 0;
         if (!at && (streak ? run : count) >= times) at = s.label;
       }
       if (at) holders.push({ player: tot.player, at });

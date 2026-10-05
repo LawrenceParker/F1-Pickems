@@ -30,24 +30,20 @@
 let defs = [];
 let lastList = '';
 
-// The "tier" column in achievements.csv is the rarity: common, rare, epic or legendary (1-4 also works).
-const TIER_NAMES = ['Common', 'Rare', 'Epic', 'Legendary'];
-const TIER_ALIASES = { common: 1, rare: 2, epic: 3, legendary: 4 };
-function tierOf(def) {
-  const v = (def.tier || '').trim().toLowerCase();
-  if (!v) return 0;
-  const n = TIER_ALIASES[v] || Number(v);
-  return n >= 1 ? Math.min(Math.round(n), 4) : 0;
-}
-const badTier = def => !!(def.tier || '').trim() && !tierOf(def);
+// The "tier" column in achievements.csv is the rarity. Listed here from lowest to highest.
+// Colours are the --common / --rare / --legendary / --epic variables at the top of style.css.
+const RARITIES = ['common', 'rare', 'legendary', 'epic'];
+const rarityOf = def => { const v = (def.tier || '').trim().toLowerCase(); return RARITIES.includes(v) ? v : ''; };
+const badTier = def => !!(def.tier || '').trim() && !rarityOf(def);
+const label = r => r.charAt(0).toUpperCase() + r.slice(1);
 
 function render(model) {
   const evals = evaluateAchievements(model, defs);
 
-  // Key for the tier colours that are actually used
-  const used = [...new Set(evals.map(ev => tierOf(ev.def)))].filter(Boolean).sort();
-  const key = used.map(t => `<span class="key"><i style="background:var(--tier-${t})"></i>${TIER_NAMES[t - 1]}</span>`).join('') +
-    (used.length && evals.some(ev => !tierOf(ev.def)) ? '<span class="key"><i style="background:var(--tier-single)"></i>No rarity</span>' : '');
+  // Key for the rarity colours that are actually used
+  const used = RARITIES.filter(r => evals.some(ev => rarityOf(ev.def) === r));
+  const key = used.map(r => `<span class="key"><i style="background:var(--${r})"></i>${label(r)}</span>`).join('') +
+    (used.length && evals.some(ev => !rarityOf(ev.def)) ? '<span class="key"><i style="background:var(--no-rarity)"></i>No rarity</span>' : '');
   const errors = evals.filter(ev => ev.error || badTier(ev.def))
     .map(ev => `<span class="flag">${esc(ev.def.name)}: ${esc(ev.error || 'unknown tier "' + ev.def.tier + '"')}</span>`).join('');
   $('summary').innerHTML = key + errors;
@@ -57,18 +53,18 @@ function render(model) {
         let earnedCount = 0;
         const cards = evals.map((ev, i) => {
           const hit = ev.holders.find(h => h.player === t.player);
-          const tier = tierOf(ev.def);
+          const rarity = rarityOf(ev.def);
           let cls, meta;
           if (hit) {
             earnedCount++;
-            cls = tier ? 'tier-' + tier : '';
+            cls = rarity;
             meta = 'Earned' + (hit.at ? ' - ' + hit.at : '');
           } else {
             cls = 'locked';
             meta = 'Locked';
           }
           return `<article class="card ${cls}" style="--i:${i}">` +
-            (tier ? `<div class="rarity">${TIER_NAMES[tier - 1]}</div>` : '') +
+            (rarity ? `<div class="rarity">${label(rarity)}</div>` : '') +
             `<h3>${esc(ev.def.name)}</h3><p>${esc(ev.def.description || '')}</p>` +
             `<div class="meta">${esc(meta)}</div></article>`;
         }).join('');
