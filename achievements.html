@@ -30,15 +30,16 @@
 let defs = [];
 let lastList = '';
 
-// The "tier" column in achievements.csv sets the card colour: 1-4, or bronze / silver / gold / diamond.
-const TIER_NAMES = ['Rare', 'Legendary', 'Epic', 'Diamond'];
-const TIER_ALIASES = { bronze: 1, silver: 2, gold: 3, diamond: 4, platinum: 4 };
+// The "tier" column in achievements.csv is the rarity: common, rare, epic or legendary (1-4 also works).
+const TIER_NAMES = ['Common', 'Rare', 'Epic', 'Legendary'];
+const TIER_ALIASES = { common: 1, rare: 2, epic: 3, legendary: 4 };
 function tierOf(def) {
   const v = (def.tier || '').trim().toLowerCase();
   if (!v) return 0;
   const n = TIER_ALIASES[v] || Number(v);
   return n >= 1 ? Math.min(Math.round(n), 4) : 0;
 }
+const badTier = def => !!(def.tier || '').trim() && !tierOf(def);
 
 function render(model) {
   const evals = evaluateAchievements(model, defs);
@@ -46,8 +47,9 @@ function render(model) {
   // Key for the tier colours that are actually used
   const used = [...new Set(evals.map(ev => tierOf(ev.def)))].filter(Boolean).sort();
   const key = used.map(t => `<span class="key"><i style="background:var(--tier-${t})"></i>${TIER_NAMES[t - 1]}</span>`).join('') +
-    (used.length && evals.some(ev => !tierOf(ev.def)) ? '<span class="key"><i style="background:var(--tier-single)"></i>No tier</span>' : '');
-  const errors = evals.filter(ev => ev.error).map(ev => `<span class="flag">${esc(ev.def.name)}: ${esc(ev.error)}</span>`).join('');
+    (used.length && evals.some(ev => !tierOf(ev.def)) ? '<span class="key"><i style="background:var(--tier-single)"></i>No rarity</span>' : '');
+  const errors = evals.filter(ev => ev.error || badTier(ev.def))
+    .map(ev => `<span class="flag">${esc(ev.def.name)}: ${esc(ev.error || 'unknown tier "' + ev.def.tier + '"')}</span>`).join('');
   $('summary').innerHTML = key + errors;
 
   const html = evals.length
@@ -60,12 +62,13 @@ function render(model) {
           if (hit) {
             earnedCount++;
             cls = tier ? 'tier-' + tier : '';
-            meta = (tier ? TIER_NAMES[tier - 1] : 'Earned') + (hit.at ? ' · ' + hit.at : '');
+            meta = 'Earned' + (hit.at ? ' - ' + hit.at : '');
           } else {
             cls = 'locked';
             meta = 'Locked';
           }
           return `<article class="card ${cls}" style="--i:${i}">` +
+            (tier ? `<div class="rarity">${TIER_NAMES[tier - 1]}</div>` : '') +
             `<h3>${esc(ev.def.name)}</h3><p>${esc(ev.def.description || '')}</p>` +
             `<div class="meta">${esc(meta)}</div></article>`;
         }).join('');
