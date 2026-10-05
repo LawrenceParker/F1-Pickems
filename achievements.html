@@ -29,6 +29,7 @@
 <script>
 let defs = [];
 let lastList = '';
+const showLocked = new Set();   // players whose locked achievements are expanded
 
 // The "tier" column in achievements.csv is the rarity. Listed here from lowest to highest.
 // Colours are the --common / --rare / --legendary / --epic variables at the top of style.css.
@@ -48,27 +49,40 @@ function render(model) {
     .map(ev => `<span class="flag">${esc(ev.def.name)}: ${esc(ev.error || 'unknown tier "' + ev.def.tier + '"')}</span>`).join('');
   $('summary').innerHTML = key + errors;
 
+  // Players alphabetical. Within a player: earned first, then by rarity (highest first), then CSV order.
+  const players = [...model.players].sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
+  const rank = r => RARITIES.indexOf(r);   // no rarity = -1, so it sorts last
+
   const html = evals.length
-    ? model.totals.map(t => {
-        let earnedCount = 0;
-        const cards = evals.map((ev, i) => {
-          const hit = ev.holders.find(h => h.player === t.player);
-          const rarity = rarityOf(ev.def);
-          let cls, meta;
-          if (hit) {
-            earnedCount++;
-            cls = rarity;
-            meta = 'Earned' + (hit.at ? ' - ' + hit.at : '');
-          } else {
-            cls = 'locked';
-            meta = 'Locked';
-          }
-          return `<article class="card ${cls}" style="--i:${i}">` +
-            (rarity ? `<div class="rarity">${label(rarity)}</div>` : '') +
-            `<h3>${esc(ev.def.name)}</h3><p>${esc(ev.def.description || '')}</p>` +
+    ? players.map(player => {
+        const items = evals.map((ev, i) => ({ ev, i, rarity: rarityOf(ev.def), hit: ev.holders.find(h => h.player === player) }));
+        items.sort((a, b) => (!!b.hit - !!a.hit) || (rank(b.rarity) - rank(a.rarity)) || (a.i - b.i));
+
+        const earned = items.filter(x => x.hit).length;
+        const locked = items.length - earned;
+        const open = showLocked.has(player);
+        const color = playerColor(model.players.indexOf(player));
+        const pills = [...used].reverse().map(r => {
+          const n = items.filter(x => x.hit && x.rarity === r).length;
+          return `<span class="rpill" style="--c:var(--${r})" title="${label(r)}"><i></i>${n}<span class="sr"> ${r}</span></span>`;
+        }).join('');
+
+        const cards = items.map((x, idx) => {
+          const meta = x.hit ? 'Earned' + (x.hit.at ? ' - ' + x.hit.at : '') : 'Locked';
+          return `<article class="card ${x.hit ? x.rarity : 'locked'}" style="--i:${idx}">` +
+            (x.rarity ? `<div class="rarity">${label(x.rarity)}</div>` : '') +
+            `<h3>${esc(x.ev.def.name)}</h3><p>${esc(x.ev.def.description || '')}</p>` +
             `<div class="meta">${esc(meta)}</div></article>`;
         }).join('');
-        return `<section class="player-block"><h2>${esc(t.player)}<small>${earnedCount} of ${evals.length} achievements</small></h2>` +
+
+        return `<section class="player-block${open ? ' show-locked' : ''}" style="--p:${color}">` +
+          `<header class="phead"><div class="avatar" aria-hidden="true">${esc([...player][0].toUpperCase())}</div>` +
+          `<div class="pinfo"><h2>${esc(player)}</h2>` +
+          `<div class="pmeta"><span><strong>${earned}</strong> of ${items.length} earned</span>${pills}</div>` +
+          `<div class="meter" aria-hidden="true"><i style="width:${(earned / items.length * 100).toFixed(0)}%"></i></div></div>` +
+          (locked ? `<button type="button" class="toggle" data-p="${esc(player)}" data-n="${locked}" aria-pressed="${open}">${open ? 'Hide locked' : 'Show locked (' + locked + ')'}</button>` : '') +
+          `</header>` +
+          (earned ? '' : '<p class="none">Nothing earned yet.</p>') +
           `<div class="cards">${cards}</div></section>`;
       }).join('')
     : `<p class="empty">No achievements yet. Add rows to ${FILES.achievements}.</p>`;
@@ -77,6 +91,17 @@ function render(model) {
   if (html !== lastList) { $('list').innerHTML = html; lastList = html; }
   setTimeout(() => document.body.classList.add('seen'), 1000);
 }
+
+// Show / hide a player's locked achievements without re-rendering.
+$('list').addEventListener('click', e => {
+  const b = e.target.closest('button.toggle');
+  if (!b) return;
+  const p = b.dataset.p, on = !showLocked.has(p);
+  on ? showLocked.add(p) : showLocked.delete(p);
+  b.closest('.player-block').classList.toggle('show-locked', on);
+  b.setAttribute('aria-pressed', on);
+  b.textContent = on ? 'Hide locked' : 'Show locked (' + b.dataset.n + ')';
+});
 
 (async function init() {
   try {
