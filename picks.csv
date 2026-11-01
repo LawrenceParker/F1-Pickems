@@ -1,4 +1,4 @@
-season,round,player,driver,session
+Ham,round,player,driver,session
 2025,1,Alex,Norris,race
 2025,1,Conor,Verstappen,race
 2025,1,Harry,Piastri,race
@@ -232,3 +232,8 @@ season,round,player,driver,session
 2026,18,Joe,Russell,race
 2026,18,Alex,Norris,race
 2026,18,Conor,Antonelli,race
+2026,19,Joe,Leclerc,race
+2026,19,Alex,Hamilton,race
+2026,19,Harry,Verstappen,race
+2026,19,Lawrence,Norris,race
+2026,19,Conor,Russell,race
